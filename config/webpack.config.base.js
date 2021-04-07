@@ -1,3 +1,4 @@
+//
 const path = require('path')
 // externals选项中，配置不打包node_modules
 const nodeExternals = require('webpack-node-externals')
