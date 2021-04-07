@@ -1,38 +1,29 @@
 import mongoose from '../config/mongoose'
-
+const defaultUrl =
+  process.env.NODE_ENV === 'production'
+    ? 'config.baseUrl.pro'
+    : 'http://localhost:3000/default'
 const UserSchema = mongoose.Schema({
   /**
    * 加入索引去重，重复会报错，然后post钩子会接受到错误，返回错误信息
    */
-  fakename: { type: String, index: { unique: true }, sparse: true },
+  fakename: { type: String },
   email: { type: String, index: { unique: true }, sparse: true },
   password: { type: String },
-  created: { type: Date },
-  updated: { type: Date },
+  lastSign: { type: Date },
   favs: { type: Number, default: 100 },
   gender: { type: String, default: '' },
   roles: { type: Array, default: ['user'] },
-  // koa-static处理静态文件
-  pic: { type: String, default: '/img/logo.png' },
+  pic: { type: String, default: `${defaultUrl}/headPic.png` }, // koa-static处理静态文件
   mobile: { type: String, match: /^1[3-9](\d{9})$/, default: '' },
   status: { type: String, default: '0' },
   regmark: { type: String, default: '' },
   location: { type: String, default: '' },
   birthday: { type: String, default: '' },
   isVip: { type: String, default: '0' },
+  lv: { type: String, default: '1' },
   count: { type: Number, default: 0 }
-})
-
-// 可以去掉
-UserSchema.pre('save', function (next) {
-  this.created = parseInt(new Date().getTime())
-  next()
-})
-
-UserSchema.pre('update', function (next) {
-  this.updated = parseInt(new Date().getTime())
-  next()
-})
+}, { timestamps: { createdAt: 'created', updatedAt: 'updated' } })
 
 UserSchema.post('save', function (error, doc, next) {
   if (error.name === 'MongoError' && error.code === 11000) {

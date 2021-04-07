@@ -17,16 +17,17 @@ async function send (sendInfo, type = 'forgetPwd') {
           <div style="border: 1px solid #dcdcdc;color: #676767;width: 600px; margin: 0 auto; padding-bottom: 50px;position: relative;">
           <div style="height: 60px; background: #393d49; line-height: 60px; color: #58a36f; font-size: 18px;padding-left: 10px;">感谢使用z网</div>
           <div style="padding: 25px">
-            <div>您好，${sendInfo.user}，请在${sendInfo.expire
-      }之前重置您的密码：</div>
+            <div>您好，${sendInfo.user}，
             <p>验证码为：${sendInfo.code}</p>
+            请在${sendInfo.expire
+      }之前重置您的密码：</div>
             <div style="padding: 5px; background: #f2f2f2;">如果该邮件不是由你本人操作，请勿进行激活！否则你的邮箱将会被他人绑定。</div>
           </div>
           <div style="background: #fafafa; color: #b4b4b4;text-align: center; line-height: 45px; height: 45px; position: absolute; left: 0; bottom: 0;width: 100%;">系统邮件，请勿直接回复</div>
       </div>
     `
   } else if (type === 'changeEmail') {
-    const sucUrl = config.baseUrl + '/#/user/accountBar/changeSucc' + '?' + `key=${sendInfo.data.key}&type='UpdateEmail'`
+    const sucUrl = config.baseUrl + '/#/user/accountBar/changeSucc' + '?' + `key=${sendInfo.data.key}&type=UpdateEmail&textName=修改绑定邮箱`
     html = `
           <div style="border: 1px solid #dcdcdc;color: #676767;width: 600px; margin: 0 auto; padding-bottom: 50px;position: relative;">
           <div style="height: 60px; background: #393d49; line-height: 60px; color: #58a36f; font-size: 18px;padding-left: 10px;">感谢使用z网</div>

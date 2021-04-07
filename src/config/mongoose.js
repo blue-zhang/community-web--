@@ -8,6 +8,7 @@ mongoose.connect(config.DB_URL, {
   useNewUrlParser: true,
   useUnifiedTopology: true
 })
+mongoose.set('useFindAndModify', false)
 
 // 连接成功
 mongoose.connection.on('connected', () => {

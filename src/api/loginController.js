@@ -1,33 +1,42 @@
 // import send from '@/config/nodemail'
 import moment from 'dayjs'
-import jsonwebtoken from 'jsonwebtoken'
+import jwt from 'jsonwebtoken'
 import config from '../config/index'
 import { checkCode, getPayload } from '@/common/utils'
 import { UserModel } from '@/model/User'
 import bcrypt from 'bcrypt'
 import { SignModel } from '@/model/Sign'
 import { getValue } from '@/config/redisConfig'
+import { CollectionModel } from '@/model/Collection'
 
 const loginController = {
-  // 登录时忘记密码的重置密码接口
+
+  // 忘记密码重置密码
   async reset (ctx) {
-    let { password, userkey } = ctx.request.body
+    let { password, code, key, email } = ctx.request.body
     password = await bcrypt.hash(password, 5)
-    const token = await getValue(userkey)
-    const obj = getPayload('Bearer ' + token)
-    const update = await UserModel.updateOne({ _id: obj._id }, { $set: { password: password } })
-    if (update.n === 1 && update.ok === 1) {
-      ctx.body = {
-        code: 200,
-        msg: '您的密码更改成功'
+    const originCode = await getValue(key)
+    if (originCode === code) {
+      const update = await UserModel.updateOne({ email: email }, { $set: { password: password } })
+      if (update.n === 1 && update.ok === 1) {
+        ctx.body = {
+          code: 200,
+          msg: '您的密码更改成功'
+        }
+      } else {
+        ctx.body = {
+          code: 500,
+          msg: '您的密码更改失败，请稍后再试，或咨询客服'
+        }
       }
     } else {
       ctx.body = {
-        code: 500,
-        msg: '您的密码更改失败，请稍后再试，或咨询客服'
+        code: 401,
+        msg: '验证码错误或已过期'
       }
     }
   },
+
   // 注册接口
   async register (ctx) {
     const { sid, fakename, code, email } = ctx.request.body
@@ -35,35 +44,38 @@ const loginController = {
     // 验证码
     const v_code = await checkCode(sid, code)
     if (v_code) {
-      const password1 = await UserModel.findOne({ fakename: fakename })
-      const password2 = await UserModel.findOne({ email: email })
-      if (password1) {
+      const v_fakename = await UserModel.findOne({ fakename: fakename })
+      const v_email = await UserModel.findOne({ email: email })
+      if (v_fakename) {
         ctx.body = {
-          code: 403,
+          code: 500,
           msg: '昵称已经存在'
         }
         return
       }
-      if (password2) {
+      if (v_email) {
         ctx.body = {
-          code: 405,
+          code: 500,
           msg: '邮箱已经注册'
         }
         return
       }
-      // 存储数据
+      // 密码加密后储存在数据库中
       password = await bcrypt.hash(password, 5)
       const user = new UserModel({
         fakename: fakename,
         email: email,
-        password: password,
-        created: moment().format('YYYY-MM-DD HH:mm:ss')
+        password: password
       })
-      // 数据库存入错误，errorHandle会报错，此处不用判断s
-      const result = await user.save()
+      // 数据库存入错误，errorHandle会报错，此处不用判断
+      const userSave = await user.save()
+      // 创建默认收藏夹
+      const collection = new CollectionModel({
+        uid: userSave._id
+      })
+      await collection.save()
       ctx.body = {
         code: 200,
-        data: result,
         msg: '注册成功'
       }
     } else {
@@ -80,71 +92,43 @@ const loginController = {
     // 验证验证码是否正确
     const v_code = await checkCode(sid, code)
     if (v_code) {
-      // let v_username = await UserModel.findOne({ $or: [{ fakename: username }, { email: username }] })
-      let v_username = await UserModel.findOne({ fakename: username })
-      // null.password会报错，要给一个默认值
-      if (!v_username) {
-        v_username = {
-          password: ''
-        }
-      }
-      if (v_username.password) {
-        /**
-         * 验证密码是否正确
-         * bcrypt.compare()密码解密，返回布尔值
-         */
-        const b_password = await bcrypt.compare(password, v_username.password)
-        if (b_password) {
-          // 使用toJSON（），让对象中只保存数据值，没有别的乱七八糟
-          const userObj = v_username.toJSON()
-          // 生成token
-          const token = jsonwebtoken.sign({ _id: userObj._id }, config.JWT_SECRET, {
-            expiresIn: config.tokenExp
-          })
-          const refreshToken = jsonwebtoken.sign({ _id: userObj._id }, config.JWT_SECRET, {
-            expiresIn: config.refreshExp
-          })
+      // 如果没有找到用户，返回 { password: '' }, 避免下面解密时报错
+      const userObj = await UserModel.findOne({ email: username }, { password: 1 }) || { password: '' }
+      const b_password = await bcrypt.compare(password, userObj.password)
+      // bcrypt.compare()返回布尔值
+      if (b_password) {
+        const userObj = await UserModel.findOne({ email: username }, { email: 0, mobile: 0, password: 0 })
+        const token = jwt.sign({ _id: userObj._id }, config.JWT_SECRET, {
+          expiresIn: config.tokenExp
+        })
+        const refreshToken = jwt.sign({ _id: userObj._id }, config.JWT_SECRET, {
+          expiresIn: config.refreshExp
+        })
 
-          // 删除敏感数据
-          // 用户id从token中获取
-          const listsDel = ['password', 'mobile', 'roles', 'email']
-          listsDel.map(item => {
-            delete userObj[item]
-          })
-          // 登录之后，查看上一次签到记录/本次签到记录
-          // -1由大到小，最新的在最前面
-          // userObj._id是objectId类型，存在sign中uid的类型是string，但是也能查到。。。
-          const sign = await SignModel.findByUid(userObj._id)
-          if (sign) {
-            if (moment(sign.created).format('YYYY-MM-DD') === moment().format('YYYY-MM-DD')) {
-              userObj.isSign = true
-            } else {
-              userObj.isSign = false
-            }
-            userObj.lastSign = sign.created
-            userObj.fav = sign.fav
+        // 查看最新的签到记录
+        const sign = await SignModel.findByUid(userObj._id)
+        if (sign) {
+          if (moment(sign.created).format('YYYY-MM-DD') === moment().format('YYYY-MM-DD')) {
+            userObj.isSign = true
           } else {
             userObj.isSign = false
-            userObj.lastSign = moment(0)
-            userObj.fav = 5
           }
-          ctx.body = {
-            code: 200,
-            msg: '登录成功',
-            token,
-            refreshToken,
-            data: userObj
-          }
+          userObj.lastSign = sign.created
         } else {
-          ctx.body = {
-            code: 404,
-            msg: '用户名或密码错误'
-          }
+          userObj.isSign = false
+          userObj.lastSign = moment(0)
+        }
+        ctx.body = {
+          code: 200,
+          msg: '登录成功',
+          token,
+          refreshToken,
+          data: userObj
         }
       } else {
         ctx.body = {
-          code: 402,
-          msg: '用户名不存在'
+          code: 404,
+          msg: '用户名或密码错误'
         }
       }
     } else {
@@ -152,6 +136,19 @@ const loginController = {
         code: 401,
         msg: '验证码错误或过期'
       }
+    }
+  },
+
+  // refresh接口
+  async refresh (ctx) {
+    const obj = await getPayload(ctx.header.authorization)
+    const token = jwt.sign({ _id: obj._id }, config.JWT_SECRET, {
+      expiresIn: config.tokenExp
+    })
+    ctx.body = {
+      code: 200,
+      msg: '获取token成功',
+      token
     }
   }
 }

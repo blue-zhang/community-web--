@@ -33,6 +33,7 @@
     "koa-jwt": "^4.0.0",
     "koa-router": "^9.4.0",
     "koa-static": "^5.0.0",
+    "koa2-history-api-fallback": "^0.1.0",
     "make-dir": "^3.1.0",
     "moment": "^2.29.1",
     "mongoose": "^5.10.8",
@@ -40,7 +41,8 @@
     "redis": "^3.0.2",
     "svg-captcha": "^1.4.0",
     "uuid": "^3.3.3",
-    "webpack-merge": "^5.1.4"
+    "webpack-merge": "^5.1.4",
+    "ws": "^7.4.4"
   },
   "devDependencies": {
     "@babel/core": "^7.11.6",

@@ -37,7 +37,7 @@ class AccountController {
     }
   }
 
-  // 修改绑定邮箱，发送邮件接口
+  // 修改绑定邮箱：发送验证邮件接口
   async changeEmail (ctx) {
     const { newEmail } = ctx.request.body
     const v_email = await UserModel.findOne({ email: newEmail })
@@ -45,10 +45,9 @@ class AccountController {
       const obj = await getPayload(ctx.header.authorization)
       const result = await UserModel.findOne({ _id: obj._id })
       const key = uuid()
-      // 邮件发送时为这次发送创建一个新的token，把新邮箱放进payload
-      // token为value，uuid为key，存在redis中
+      // token为value，id为key，存在redis中
       setValue(key, jwt.sign({ _id: obj._id, newEmail: newEmail }, config.JWT_SECRET, { expiresIn: 600 }), 600)
-      const mail = await send({
+      await send({
         data: {
           // nodemail通过key取得用户token,发送到前端修改成功页面，前端解析token,发送更新邮箱的请求
           key: key
@@ -59,22 +58,22 @@ class AccountController {
       }, 'changeEmail')
       ctx.body = {
         code: 200,
-        data: mail,
         msg: '邮件发送成功'
       }
     } else {
       ctx.body = {
         code: 500,
-        msg: '该邮箱已经注册'
+        msg: '该邮箱已经被注册'
       }
     }
   }
 
-  // 修改绑定邮箱，更新邮箱接口
+  // 修改绑定邮箱：更新邮箱接口
   async updateEmail (ctx) {
     const { key } = ctx.request.body
+    // changeEmail 接口将 token 存在 redis 中
     const result = await getValue(key)
-    // Bearer前缀是axios请求拦截器中在headers中config.headers.Authorization中设置的
+    // 解析从 redis 中获取的 token，得到 payload
     const obj = await getPayload('Bearer ' + result)
     const update = await UserModel.updateOne({ _id: obj._id }, { $set: { email: obj.newEmail } })
     if (update.n === 1 && update.ok === 1) {
@@ -107,6 +106,57 @@ class AccountController {
         msg: '您的密码更改失败，请稍后再试，或咨询客服'
       }
     }
+  }
+
+  // 验证 邮箱 和 手机 的验证码
+  async otherVerify (ctx) {
+    const { key, code } = ctx.request.body
+    const originCode = await getValue(key)
+    if (originCode === code) {
+      ctx.body = {
+        code: 200,
+        msg: '验证成功'
+      }
+    } else {
+      ctx.body = {
+        code: 500,
+        msg: '验证码错误或已过期'
+      }
+    }
+  }
+
+  // 发送邮件验证码
+  async sendEmail (ctx) {
+    const { email } = ctx.request.body
+    const captcha = `${Math.floor(Math.random() * 1000000)}`
+    const user = await UserModel.findOne({ email: email })
+    if (user) {
+      // 验证码的 key
+      const sid = uuid()
+      setValue(sid, captcha, 10 * 60)
+      await send({
+        code: captcha,
+        expire: moment()
+          .add(10, 'minutes')
+          .format('YYYY-MM-DD HH:mm:ss'),
+        email: email,
+        user: email
+      })
+      ctx.body = {
+        code: 200,
+        msg: '邮件发送成功',
+        key: sid
+      }
+    } else {
+      ctx.body = {
+        code: 500,
+        msg: '该邮箱未注册'
+      }
+    }
+  }
+
+  async sendMobil () {
+
   }
 }
 export default new AccountController()

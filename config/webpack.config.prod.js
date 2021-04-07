@@ -14,16 +14,16 @@ const webpackConfig = merge(webpackConfigBase, {
             // 是否注释掉console
             drop_console: false,
             dead_code: true,
-            drop_debugger: true,
+            drop_debugger: true
           },
           output: {
             comments: false,
-            beautify: false,
+            beautify: false
           },
-          mangle: true,
+          mangle: true
         },
         parallel: true,
-        sourceMap: false,
+        sourceMap: false
       })
     ],
     splitChunks: {

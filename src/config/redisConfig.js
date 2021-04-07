@@ -51,26 +51,22 @@ const setValue = (key, value, time) => {
   }
 }
 
-const getValue = (key) => {
-  return client.getAsync(key)
+const getValue = async (key) => {
+  return await client.getAsync(key)
 }
 
-const getHValue = (key) => {
-  // v8 Promisify method use util, must node > 8
-  // return promisify(client.hgetall).bind(client)(key)
-
-  // bluebird async
-  return client.hgetallAsync(key)
+const getHValue = async (key) => {
+  return await client.hgetallAsync(key)
 }
 
-const delValue = (key) => {
-  client.del(key, (err, res) => {
-    if (res === 1) {
-      console.log('delete successfully')
-    } else {
-      console.log('delete redis key error:' + err)
-    }
-  })
+const delValue = async (key) => {
+  const result = await client.delAsync(key)
+  return result
 }
 
-export { client, setValue, getValue, getHValue, delValue }
+const exists = async (key) => {
+  const result = await client.existsAsync(key)
+  return result
+}
+
+export { client, setValue, getValue, getHValue, delValue, exists }
